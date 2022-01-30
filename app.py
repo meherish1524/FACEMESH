@@ -1,153 +1,99 @@
-import sys,tweepy,csv,re
-from textblob import TextBlob
-import matplotlib.pyplot as plt
+import mediapipe as mp
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_face_mesh = mp.solutions.face_mesh
 
+# For static images:
+IMAGE_FILES = []
+drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
+with mp_face_mesh.FaceMesh(
+    static_image_mode=True,
+    max_num_faces=1,
+    refine_landmarks=True,
+    min_detection_confidence=0.5) as face_mesh:
+  for idx, file in enumerate(IMAGE_FILES):
+    image = cv2.imread(file)
+    # Convert the BGR image to RGB before processing.
+    results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
-class SentimentAnalysis:
+    # Print and draw face mesh landmarks on the image.
+    if not results.multi_face_landmarks:
+      continue
+    annotated_image = image.copy()
+    for face_landmarks in results.multi_face_landmarks:
+      print('face_landmarks:', face_landmarks)
+      mp_drawing.draw_landmarks(
+          image=annotated_image,
+          landmark_list=face_landmarks,
+          connections=mp_face_mesh.FACEMESH_TESSELATION,
+          landmark_drawing_spec=None,
+          connection_drawing_spec=mp_drawing_styles
+          .get_default_face_mesh_tesselation_style())
+      mp_drawing.draw_landmarks(
+          image=annotated_image,
+          landmark_list=face_landmarks,
+          connections=mp_face_mesh.FACEMESH_CONTOURS,
+          landmark_drawing_spec=None,
+          connection_drawing_spec=mp_drawing_styles
+          .get_default_face_mesh_contours_style())
+      mp_drawing.draw_landmarks(
+          image=annotated_image,
+          landmark_list=face_landmarks,
+          connections=mp_face_mesh.FACEMESH_IRISES,
+          landmark_drawing_spec=None,
+          connection_drawing_spec=mp_drawing_styles
+          .get_default_face_mesh_iris_connections_style())
+    cv2.imwrite('/tmp/annotated_image' + str(idx) + '.png', annotated_image)
 
-    def __init__(self):
-        self.tweets = []
-        self.tweetText = []
+# For webcam input:
+drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
+cap = cv2.VideoCapture(0)
+with mp_face_mesh.FaceMesh(
+    max_num_faces=1,
+    refine_landmarks=True,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5) as face_mesh:
+  while cap.isOpened():
+    success, image = cap.read()
+    if not success:
+      print("Ignoring empty camera frame.")
+      # If loading a video, use 'break' instead of 'continue'.
+      continue
 
-    def DownloadData(self):
-        # authenticating
-        consumerKey ="YOUR CONSMERKEY"
-        consumerSecret ="YOUR CONSMERSECRET"
-        accessToken ="YOUR ACCESSTOKEN"
-        accessTokenSecret="YOUR ACCESSTOKEN SECRET"
-        try:
-            auth = tweepy.OAuthHandler(consumerKey,consumerSecret)
-            auth.set_access_token(accessToken,accessTokenSecret)
-            api=tweepy.API(auth)
-        except BaseException as e:
-            print("Exception occured in authentication block: ",e)
+    # To improve performance, optionally mark the image as not writeable to
+    # pass by reference.
+    image.flags.writeable = False
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    results = face_mesh.process(image)
 
-        # input for term to be searched and how many tweets to search
-        searchTerm = input("Enter Keyword/Tag to search about: ")
-        NoOfTerms = int(input("Enter how many tweets to search: "))
-
-        # searching for tweets
-        try:
-            self.tweets = tweepy.Cursor(api.search_tweets, q=searchTerm, lang = "en").items(NoOfTerms)
-        except tweepy.TweepyException as e:
-            print(e)
-        # Open/create a file to append data to
-        csvFile = open('result.csv', 'a')
-
-        # Use csv writer
-        csvWriter = csv.writer(csvFile)
-
-
-        # creating some variables to store info
-        polarity = 0
-        positive = 0
-        wpositive = 0
-        spositive = 0
-        negative = 0
-        wnegative = 0
-        snegative = 0
-        neutral = 0
-
-
-        # iterating through tweets fetched
-        for tweet in self.tweets:
-            #Append to temp so that we can store in csv later. I use encode UTF-8
-            self.tweetText.append(self.cleanTweet(tweet.text).encode('utf-8'))
-            # print (tweet.text.translate(non_bmp_map))    #print tweet's text
-            analysis = TextBlob(tweet.text)
-            # print(analysis.sentiment)  # print tweet's polarity
-            polarity += analysis.sentiment.polarity  # adding up polarities to find the average later
-
-            if (analysis.sentiment.polarity == 0):  # adding reaction of how people are reacting to find average later
-                neutral += 1
-            elif (analysis.sentiment.polarity > 0 and analysis.sentiment.polarity <= 0.3):
-                wpositive += 1
-            elif (analysis.sentiment.polarity > 0.3 and analysis.sentiment.polarity <= 0.6):
-                positive += 1
-            elif (analysis.sentiment.polarity > 0.6 and analysis.sentiment.polarity <= 1):
-                spositive += 1
-            elif (analysis.sentiment.polarity > -0.3 and analysis.sentiment.polarity <= 0):
-                wnegative += 1
-            elif (analysis.sentiment.polarity > -0.6 and analysis.sentiment.polarity <= -0.3):
-                negative += 1
-            elif (analysis.sentiment.polarity > -1 and analysis.sentiment.polarity <= -0.6):
-                snegative += 1
-
-
-        # Write to csv and close csv file
-        csvWriter.writerow(self.tweetText)
-        csvFile.close()
-
-        # finding average of how people are reacting
-        positive = self.percentage(positive, NoOfTerms)
-        wpositive = self.percentage(wpositive, NoOfTerms)
-        spositive = self.percentage(spositive, NoOfTerms)
-        negative = self.percentage(negative, NoOfTerms)
-        wnegative = self.percentage(wnegative, NoOfTerms)
-        snegative = self.percentage(snegative, NoOfTerms)
-        neutral = self.percentage(neutral, NoOfTerms)
-
-        # finding average reaction
-        polarity = polarity / NoOfTerms
-
-        # printing out data
-        print("How people are reacting on " + searchTerm + " by analyzing " + str(NoOfTerms) + " tweets.")
-        print()
-        print("General Report: ")
-
-        if (polarity == 0):
-            print("Neutral")
-        elif (polarity > 0 and polarity <= 0.3):
-            print("Weakly Positive")
-        elif (polarity > 0.3 and polarity <= 0.6):
-            print("Positive")
-        elif (polarity > 0.6 and polarity <= 1):
-            print("Strongly Positive")
-        elif (polarity > -0.3 and polarity <= 0):
-            print("Weakly Negative")
-        elif (polarity > -0.6 and polarity <= -0.3):
-            print("Negative")
-        elif (polarity > -1 and polarity <= -0.6):
-            print("Strongly Negative")
-
-        print()
-        print("Detailed Report: ")
-        print(str(positive) + "% people thought it was positive")
-        print(str(wpositive) + "% people thought it was weakly positive")
-        print(str(spositive) + "% people thought it was strongly positive")
-        print(str(negative) + "% people thought it was negative")
-        print(str(wnegative) + "% people thought it was weakly negative")
-        print(str(snegative) + "% people thought it was strongly negative")
-        print(str(neutral) + "% people thought it was neutral")
-
-        self.plotPieChart(positive, wpositive, spositive, negative, wnegative, snegative, neutral, searchTerm, NoOfTerms)
-
-
-    def cleanTweet(self, tweet):
-        # Remove Links, Special Characters etc from tweet
-        return ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t]) | (\w +:\ / \ / \S +)", " ", tweet).split())
-
-    # function to calculate percentage
-    def percentage(self, part, whole):
-        temp = 100 * float(part) / float(whole)
-        return format(temp, '.2f')
-
-    def plotPieChart(self, positive, wpositive, spositive, negative, wnegative, snegative, neutral, searchTerm, noOfSearchTerms):
-        labels = ['Positive [' + str(positive) + '%]', 'Weakly Positive [' + str(wpositive) + '%]','Strongly Positive [' + str(spositive) + '%]', 'Neutral [' + str(neutral) + '%]',
-                  'Negative [' + str(negative) + '%]', 'Weakly Negative [' + str(wnegative) + '%]', 'Strongly Negative [' + str(snegative) + '%]']
-        sizes = [positive, wpositive, spositive, neutral, negative, wnegative, snegative]
-        colors = ['yellowgreen','lightgreen','darkgreen', 'gold', 'red','lightsalmon','darkred']
-        patches, texts = plt.pie(sizes, colors=colors, startangle=90)
-        plt.legend(patches, labels, loc="best")
-        plt.title('How people are reacting on ' + searchTerm + ' by analyzing ' + str(noOfSearchTerms) + ' Tweets.')
-        plt.axis('equal')
-        plt.tight_layout()
-        plt.show()
-
-
-
-if __name__== "__main__":
-    sa = SentimentAnalysis()
-    sa.DownloadData()
-
-        
+    # Draw the face mesh annotations on the image.
+    image.flags.writeable = True
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    if results.multi_face_landmarks:
+      for face_landmarks in results.multi_face_landmarks:
+        mp_drawing.draw_landmarks(
+            image=image,
+            landmark_list=face_landmarks,
+            connections=mp_face_mesh.FACEMESH_TESSELATION,
+            landmark_drawing_spec=None,
+            connection_drawing_spec=mp_drawing_styles
+            .get_default_face_mesh_tesselation_style())
+        mp_drawing.draw_landmarks(
+            image=image,
+            landmark_list=face_landmarks,
+            connections=mp_face_mesh.FACEMESH_CONTOURS,
+            landmark_drawing_spec=None,
+            connection_drawing_spec=mp_drawing_styles
+            .get_default_face_mesh_contours_style())
+        mp_drawing.draw_landmarks(
+            image=image,
+            landmark_list=face_landmarks,
+            connections=mp_face_mesh.FACEMESH_IRISES,
+            landmark_drawing_spec=None,
+            connection_drawing_spec=mp_drawing_styles
+            .get_default_face_mesh_iris_connections_style())
+    # Flip the image horizontally for a selfie-view display.
+    cv2.imshow('MediaPipe Face Mesh', cv2.flip(image, 1))
+    if cv2.waitKey(5) & 0xFF == 27:
+      break
+cap.release()
