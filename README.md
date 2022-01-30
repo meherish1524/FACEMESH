@@ -1,37 +1,23 @@
-# Twitter_Sentiment_Analysis1524
+# FACEMESH
 
 
 
-![Screen_Shot](https://github.com/meherish1524/Twitter_Sentiment_Analysis1524/blob/main/Capture12.PNG?raw=true)
+![Screen_Shot](https://github.com/meherish1524/FACEMESH/blob/main/output.jpeg?raw=true)
 
 
-## Getting Started
- 
-First of all login from your Twitter account and goto [Twitter Apps](https://apps.twitter.com/). Create a new app and goto __Keys and access tokens__ and copy Consumer Key, Consumer Secret, Access Token and Access Token Secret. We will need them later. 
+## Overview
 
-### Installation
-
-Download or Clone the repo, Navigate to the directory containing the files and run
-```
-python setup.py install
-```
-or if you have different versions of python installed then
-```
-python3 setup.py install 
-```
-to install the dependencies.
+MediaPipe Face Mesh is a face geometry solution that estimates 468 3D face landmarks in real-time even on mobile devices. It employs machine learning (ML) to infer the 3D surface geometry, requiring only a single camera input without the need for a dedicated depth sensor. Utilizing lightweight model architectures together with GPU acceleration throughout the pipeline, the solution delivers real-time performance critical for live experiences.
 
 
-### Usage
-
-Once you have created an app on twitter and installed all the dependencies by running __setup.py__, open main.py and paste your Consumer Key, Consumer Secret, Access Token and Access Token Secret. After that save and run the script. You will be prompted to enter the keyword/hashtag you want to analyze and the number of tweets you want to analyze. Once the analysis is completed, a pie chart will be generated disclosing the results of analysis.
+## ML Pipeline
+Our ML pipeline consists of two real-time deep neural network models that work together: A detector that operates on the full image and computes face locations and a 3D face landmark model that operates on those locations and predicts the approximate surface geometry via regression. Having the face accurately cropped drastically reduces the need for common data augmentations like affine transformations consisting of rotations, translation and scale changes
 
 ## Built With
 
 * Python 3.6
-* tweepy
-* textblob
-* matplotlib
+* cv2
+* mediapipe
 
 ## Contributing
 
