@@ -1,0 +1,5 @@
+tweepy
+textblob
+matplotlib
+twitter_access_keys
+csv
